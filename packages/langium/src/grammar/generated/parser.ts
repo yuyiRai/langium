@@ -9,7 +9,7 @@ import { createToken, Lexer } from 'chevrotain';
 import { LangiumServices } from '../../services';
 import { LangiumParser, DatatypeSymbol } from '../../parser/langium-parser';
 import { LangiumGrammarGrammarAccess } from './grammar-access';
-import { AbstractElement, AbstractMetamodelDeclaration, AbstractNegatedToken, AbstractRule, Annotation, Condition, Grammar, NamedArgument, Parameter, TerminalTokenElement, Action, Alternatives, Assignment, CrossReference, Group, Keyword, RuleCall, UnorderedGroup, GeneratedMetamodel, ReferencedMetamodel, NegatedToken, UntilToken, ParserRule, TerminalRule, Conjunction, Disjunction, LiteralCondition, Negation, ParameterReference, CharacterRange, TerminalAlternatives, TerminalRuleCall, Wildcard, TerminalGroup, TerminalToken, } from './ast';
+import { AbstractElement, AbstractMetamodelDeclaration, AbstractNegatedToken, AbstractRule, Annotation, Condition, Declaration, Grammar, NamedArgument, Parameter, TerminalTokenElement, TypeAttribute, Action, Alternatives, Assignment, CrossReference, Group, Keyword, RuleCall, UnorderedGroup, GeneratedMetamodel, ReferencedMetamodel, NegatedToken, UntilToken, ParserRule, TerminalRule, Conjunction, Disjunction, LiteralCondition, Negation, ParameterReference, TypeDeclaration, CharacterRange, TerminalAlternatives, TerminalRuleCall, Wildcard, TerminalGroup, TerminalToken, } from './ast';
 
 const ID = createToken({ name: 'ID', pattern: /\^?[_a-zA-Z][\w_]*/ });
 const INT = createToken({ name: 'INT', pattern: /[0-9]+/ });
@@ -28,6 +28,7 @@ const HiddenKeyword = createToken({ name: 'HiddenKeyword', pattern: /hidden/, lo
 const ImportKeyword = createToken({ name: 'ImportKeyword', pattern: /import/, longer_alt: ID });
 const FalseKeyword = createToken({ name: 'FalseKeyword', pattern: /false/, longer_alt: ID });
 const TrueKeyword = createToken({ name: 'TrueKeyword', pattern: /true/, longer_alt: ID });
+const TypeKeyword = createToken({ name: 'TypeKeyword', pattern: /type/, longer_alt: ID });
 const WithKeyword = createToken({ name: 'WithKeyword', pattern: /with/, longer_alt: ID });
 const AsKeyword = createToken({ name: 'AsKeyword', pattern: /as/, longer_alt: ID });
 const DashMoreThanKeyword = createToken({ name: 'DashMoreThanKeyword', pattern: /->/ });
@@ -92,8 +93,9 @@ ImportKeyword.LABEL = "'import'";
 ReturnsKeyword.LABEL = "'returns'";
 TerminalKeyword.LABEL = "'terminal'";
 TrueKeyword.LABEL = "'true'";
+TypeKeyword.LABEL = "'type'";
 WithKeyword.LABEL = "'with'";
-const tokens = [FragmentKeyword, GenerateKeyword, TerminalKeyword, CurrentKeyword, GrammarKeyword, ReturnsKeyword, HiddenKeyword, ImportKeyword, FalseKeyword, TrueKeyword, WithKeyword, AsKeyword, DashMoreThanKeyword, DotDotKeyword, EqualsMoreThanKeyword, PlusEqualsKeyword, QuestionMarkEqualsKeyword, AmpersandKeyword, AsteriskKeyword, AtKeyword, BracketCloseKeyword, BracketOpenKeyword, ColonKeyword, CommaKeyword, CurlyCloseKeyword, CurlyOpenKeyword, DotKeyword, EqualsKeyword, ExclamationMarkKeyword, LessThanKeyword, MoreThanKeyword, ParenthesisCloseKeyword, ParenthesisOpenKeyword, PipeKeyword, PlusKeyword, QuestionMarkKeyword, SemicolonKeyword, ID, INT, ML_COMMENT, RegexLiteral, SL_COMMENT, string, WS];
+const tokens = [FragmentKeyword, GenerateKeyword, TerminalKeyword, CurrentKeyword, GrammarKeyword, ReturnsKeyword, HiddenKeyword, ImportKeyword, FalseKeyword, TrueKeyword, TypeKeyword, WithKeyword, AsKeyword, DashMoreThanKeyword, DotDotKeyword, EqualsMoreThanKeyword, PlusEqualsKeyword, QuestionMarkEqualsKeyword, AmpersandKeyword, AsteriskKeyword, AtKeyword, BracketCloseKeyword, BracketOpenKeyword, ColonKeyword, CommaKeyword, CurlyCloseKeyword, CurlyOpenKeyword, DotKeyword, EqualsKeyword, ExclamationMarkKeyword, LessThanKeyword, MoreThanKeyword, ParenthesisCloseKeyword, ParenthesisOpenKeyword, PipeKeyword, PlusKeyword, QuestionMarkKeyword, SemicolonKeyword, ID, INT, ML_COMMENT, RegexLiteral, SL_COMMENT, string, WS];
 
 export class Parser extends LangiumParser {
     readonly grammarAccess: LangiumGrammarGrammarAccess;
@@ -130,8 +132,70 @@ export class Parser extends LangiumParser {
             this.subrule(1, this.AbstractMetamodelDeclaration, this.grammarAccess.Grammar.metamodelDeclarationsAbstractMetamodelDeclarationRuleCall);
         });
         this.atLeastOne(4, () => {
-            this.subrule(2, this.AbstractRule, this.grammarAccess.Grammar.rulesAbstractRuleRuleCall);
+            this.or(1, [
+                () => {
+                    this.subrule(2, this.AbstractRule, this.grammarAccess.Grammar.rulesAbstractRuleRuleCall);
+                },
+                () => {
+                    this.subrule(3, this.TypeDeclaration, this.grammarAccess.Grammar.typesTypeDeclarationRuleCall);
+                },
+            ]);
         });
+        return this.construct();
+    });
+
+    Declaration = this.DEFINE_RULE("Declaration", Declaration, () => {
+        this.initializeElement(this.grammarAccess.Declaration);
+        this.or(1, [
+            () => {
+                this.unassignedSubrule(1, this.AbstractRule, this.grammarAccess.Declaration.AbstractRuleRuleCall);
+            },
+            () => {
+                this.unassignedSubrule(2, this.TypeDeclaration, this.grammarAccess.Declaration.TypeDeclarationRuleCall);
+            },
+        ]);
+        return this.construct();
+    });
+
+    TypeDeclaration = this.DEFINE_RULE("TypeDeclaration", TypeDeclaration, () => {
+        this.initializeElement(this.grammarAccess.TypeDeclaration);
+        this.consume(1, TypeKeyword, this.grammarAccess.TypeDeclaration.TypeKeyword);
+        this.consume(2, ID, this.grammarAccess.TypeDeclaration.nameIDRuleCall);
+        this.consume(3, EqualsKeyword, this.grammarAccess.TypeDeclaration.EqualsKeyword);
+        this.or(1, [
+            () => {
+                this.consume(4, CurlyOpenKeyword, this.grammarAccess.TypeDeclaration.CurlyOpenKeyword);
+                this.subrule(1, this.TypeAttribute, this.grammarAccess.TypeDeclaration.attributesTypeAttributeRuleCall);
+                this.many(1, () => {
+                    this.consume(5, SemicolonKeyword, this.grammarAccess.TypeDeclaration.SemicolonKeyword);
+                    this.subrule(2, this.TypeAttribute, this.grammarAccess.TypeDeclaration.attributesTypeAttributeRuleCall);
+                });
+                this.consume(6, CurlyCloseKeyword, this.grammarAccess.TypeDeclaration.CurlyCloseKeyword);
+            },
+            () => {
+                this.consume(7, ID, this.grammarAccess.TypeDeclaration.typeAlternativesDeclarationCrossReference);
+                this.many(2, () => {
+                    this.consume(8, PipeKeyword, this.grammarAccess.TypeDeclaration.PipeKeyword);
+                    this.consume(9, ID, this.grammarAccess.TypeDeclaration.typeAlternativesDeclarationCrossReference);
+                });
+                this.consume(10, SemicolonKeyword, this.grammarAccess.TypeDeclaration.SemicolonKeyword);
+            },
+        ]);
+        return this.construct();
+    });
+
+    TypeAttribute = this.DEFINE_RULE("TypeAttribute", TypeAttribute, () => {
+        this.initializeElement(this.grammarAccess.TypeAttribute);
+        this.consume(1, ID, this.grammarAccess.TypeAttribute.nameIDRuleCall);
+        this.consume(2, ColonKeyword, this.grammarAccess.TypeAttribute.ColonKeyword);
+        this.or(1, [
+            () => {
+                this.consume(3, ID, this.grammarAccess.TypeAttribute.typeReferenceTypeDeclarationCrossReference);
+            },
+            () => {
+                this.subrule(1, this.Keyword, this.grammarAccess.TypeAttribute.builtinTypeKeywordRuleCall);
+            },
+        ]);
         return this.construct();
     });
 

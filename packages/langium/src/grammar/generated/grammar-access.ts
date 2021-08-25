@@ -25,6 +25,38 @@ export type GrammarRuleAccess = {
     metamodelDeclarationsAbstractMetamodelDeclarationRuleCall: RuleCall;
     rules: Assignment;
     rulesAbstractRuleRuleCall: RuleCall;
+    types: Assignment;
+    typesTypeDeclarationRuleCall: RuleCall;
+}
+
+export type DeclarationRuleAccess = {
+    AbstractRuleRuleCall: RuleCall;
+    TypeDeclarationRuleCall: RuleCall;
+}
+
+export type TypeDeclarationRuleAccess = {
+    TypeKeyword: Keyword;
+    name: Assignment;
+    nameIDRuleCall: RuleCall;
+    EqualsKeyword: Keyword;
+    CurlyOpenKeyword: Keyword;
+    attributes: Assignment;
+    attributesTypeAttributeRuleCall: RuleCall;
+    SemicolonKeyword: Keyword;
+    CurlyCloseKeyword: Keyword;
+    typeAlternatives: Assignment;
+    typeAlternativesDeclarationCrossReference: CrossReference;
+    PipeKeyword: Keyword;
+}
+
+export type TypeAttributeRuleAccess = {
+    name: Assignment;
+    nameIDRuleCall: RuleCall;
+    ColonKeyword: Keyword;
+    typeReference: Assignment;
+    typeReferenceTypeDeclarationCrossReference: CrossReference;
+    builtinType: Assignment;
+    builtinTypeKeywordRuleCall: RuleCall;
 }
 
 export type AbstractRuleRuleAccess = {
@@ -414,6 +446,9 @@ export type CharacterRangeRuleAccess = {
 
 export class LangiumGrammarGrammarAccess extends GrammarAccess {
     Grammar = this.buildAccess<GrammarRuleAccess>('Grammar');
+    Declaration = this.buildAccess<DeclarationRuleAccess>('Declaration');
+    TypeDeclaration = this.buildAccess<TypeDeclarationRuleAccess>('TypeDeclaration');
+    TypeAttribute = this.buildAccess<TypeAttributeRuleAccess>('TypeAttribute');
     AbstractRule = this.buildAccess<AbstractRuleRuleAccess>('AbstractRule');
     AbstractMetamodelDeclaration = this.buildAccess<AbstractMetamodelDeclarationRuleAccess>('AbstractMetamodelDeclaration');
     GeneratedMetamodel = this.buildAccess<GeneratedMetamodelRuleAccess>('GeneratedMetamodel');

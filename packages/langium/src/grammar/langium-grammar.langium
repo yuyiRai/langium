@@ -12,7 +12,20 @@ Grammar:
 	'grammar' name=ID ('with' usedGrammars+=[Grammar|ID] (',' usedGrammars+=[Grammar|ID])*)?
 	(definesHiddenTokens?='hidden' '(' (hiddenTokens+=[AbstractRule|ID] (',' hiddenTokens+=[AbstractRule|ID])*)? ')')?
 	metamodelDeclarations+=AbstractMetamodelDeclaration*
-	(rules+=AbstractRule)+;
+	(rules+=AbstractRule | types+=TypeDeclaration)+;
+
+
+Declaration : AbstractRule | TypeDeclaration;
+
+TypeDeclaration :
+	'type' name=ID '=' (
+		('{' attributes+=TypeAttribute (';' attributes+=TypeAttribute)* '}') |
+		(typeAlternatives+=[Declaration] ('|' typeAlternatives+=[Declaration])* ';')
+	);
+
+TypeAttribute : 
+	name=ID ':' (typeReference=[TypeDeclaration] | builtinType=Keyword);
+
 
 AbstractRule : ParserRule | TerminalRule;
 
@@ -31,8 +44,8 @@ Annotation:
 
 ParserRule :
 	(
-	  ^fragment?='fragment' RuleNameAndParams (wildcard?='*' | ('returns' type=ID)?)
-	| RuleNameAndParams ('returns' type=ID)?
+	  ^fragment?='fragment' RuleNameAndParams (wildcard?='*' | ('returns' ^type=ID)?)
+	| RuleNameAndParams ('returns' ^type=ID)?
 	)
 	(definesHiddenTokens?='hidden' '(' (hiddenTokens+=[AbstractRule|ID] (',' hiddenTokens+=[AbstractRule|ID])*)? ')')? ':'
 		alternatives=Alternatives
@@ -61,7 +74,7 @@ AbstractTokenWithCardinality returns AbstractElement:
 	(Assignment | AbstractTerminal) cardinality=('?'|'*'|'+')?;
 
 Action returns AbstractElement:
-	{Action} '{' type=ID ('.' feature=ID operator=('='|'+=') 'current')? '}';
+	{Action} '{' ^type=ID ('.' feature=ID operator=('='|'+=') 'current')? '}';
 
 AbstractTerminal returns AbstractElement:
 	Keyword |
@@ -124,7 +137,7 @@ AssignableAlternatives returns AbstractElement:
 	AssignableTerminal ({Alternatives.elements+=current} ('|' elements+=AssignableTerminal)+)?;
 
 CrossReference returns AbstractElement:
-	{CrossReference} '[' type=[ParserRule|ID] ('|' ^terminal=CrossReferenceableTerminal )? ']';
+	{CrossReference} '[' ^type=[ParserRule|ID] ('|' ^terminal=CrossReferenceableTerminal )? ']';
 
 CrossReferenceableTerminal returns AbstractElement:
 	Keyword | RuleCall;
@@ -136,7 +149,7 @@ PredicatedGroup returns Group:
 	(predicated?='=>' | firstSetPredicated?='->') '(' elements+=Alternatives ')';
 
 TerminalRule :
-	'terminal' (^fragment?='fragment' name=ID | name=ID ('returns' type=ID)?) ':'
+	'terminal' (^fragment?='fragment' name=ID | name=ID ('returns' ^type=ID)?) ':'
 		regex=RegexLiteral
 	';';
 
