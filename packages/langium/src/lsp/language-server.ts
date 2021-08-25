@@ -5,9 +5,11 @@
  ******************************************************************************/
 
 import {
+    CancellationToken,
+    CompletionItem,
     CompletionList, Connection,
     DocumentHighlightParams, DocumentSymbol, DocumentSymbolParams, InitializeParams, InitializeResult,
-    Location, LocationLink, ReferenceParams, TextDocumentPositionParams, TextDocumentSyncKind
+    Location, LocationLink, ReferenceParams, ResultProgressReporter, TextDocumentPositionParams, TextDocumentSyncKind, WorkDoneProgressReporter
 } from 'vscode-languageserver/node';
 import { LangiumDocument } from '../documents/document';
 import { LangiumServices } from '../services';
@@ -26,8 +28,12 @@ export function startLanguageServer(services: LangiumServices): void {
             capabilities: {
                 textDocumentSync: TextDocumentSyncKind.Incremental,
                 // Tell the client that this server supports code completion.
-                completionProvider: {},
-                referencesProvider: {}, // TODO enable workDoneProgress?
+                completionProvider: {
+                    workDoneProgress: true
+                },
+                referencesProvider: {
+                    workDoneProgress: true
+                }, // TODO enable workDoneProgress?
                 documentSymbolProvider: {},
                 definitionProvider: {},
                 documentHighlightProvider: {},
@@ -42,6 +48,13 @@ export function startLanguageServer(services: LangiumServices): void {
                 }
             };
         }
+
+        (async () => { await new Promise(resolve => setTimeout(() => {
+            console.log('blah');
+            resolve;
+        }, 10000)); })();
+
+        console.log(JSON.stringify(result));
         return result;
     });
 
@@ -67,32 +80,46 @@ export function startLanguageServer(services: LangiumServices): void {
 export function addCompletionHandler(connection: Connection, services: LangiumServices): void {
     // TODO create an extensible service API for completion
     connection.onCompletion(
-        (_textDocumentPosition: TextDocumentPositionParams): CompletionList => {
-            const document = paramsDocument(_textDocumentPosition, services);
-            if (document) {
-                const text = document.getText();
-                const offset = document.offsetAt(_textDocumentPosition.position);
-                const parser = services.parser.LangiumParser;
-                const parseResult = parser.parse(text);
-                const rootNode = parseResult.value;
-                (rootNode as { $document: LangiumDocument }).$document = document;
-                document.parseResult = parseResult;
-                document.precomputedScopes = services.references.ScopeComputation.computeScope(document);
-                const completionProvider = services.lsp.completion.CompletionProvider;
-                const assist = completionProvider.getCompletion(rootNode, offset);
-                return assist;
-            } else {
-                return CompletionList.create();
-            }
+        (_textDocumentPosition: TextDocumentPositionParams, cancel: CancellationToken, workDoneProgress: WorkDoneProgressReporter, resultProgress?: ResultProgressReporter<CompletionItem[]>): Promise<CompletionList> => {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    const document = paramsDocument(_textDocumentPosition, services);
+                    if (cancel.isCancellationRequested) {
+                        resolve(CompletionList.create());
+                    } else if (document) {
+                        workDoneProgress.begin("foo", 0);
+                        const text = document.getText();
+                        const offset = document.offsetAt(_textDocumentPosition.position);
+                        const parser = services.parser.LangiumParser;
+                        const parseResult = parser.parse(text);
+                        const rootNode = parseResult.value;
+                        console.log(cancel.isCancellationRequested);
+                        (rootNode as { $document: LangiumDocument }).$document = document;
+                        document.parseResult = parseResult;
+                        document.precomputedScopes = services.references.ScopeComputation.computeScope(document);
+                        const completionProvider = services.lsp.completion.CompletionProvider;
+                        const assist = completionProvider.getCompletion(rootNode, offset);
+                        if (resultProgress) {
+                            for (const item of assist.items)
+                                resultProgress?.report([item]);
+                            resolve(CompletionList.create());
+                        } else
+                            resolve(assist);
+                    } else {
+                        resolve(CompletionList.create());
+                    }
+                }, 2000);
+            });
         }
     );
 }
 
 export function addFindReferencesHandler(connection: Connection, services: LangiumServices): void {
     const referenceFinder = services.lsp.ReferenceFinder;
-    connection.onReferences((params: ReferenceParams): Location[] => {
+    connection.onReferences((params: ReferenceParams, cancel, workDoneProgress: MyReporter): Location[] => {
         const document = paramsDocument(params, services);
         if (document) {
+            workDoneProgress.begin('Start find refs', 0, undefined, false);
             return referenceFinder.findReferences(document, params, params.context.includeDeclaration);
         } else {
             return [];
