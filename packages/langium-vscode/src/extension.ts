@@ -8,70 +8,135 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { workspace } from 'vscode';
 import {
-	LanguageClient, LanguageClientOptions, ServerOptions, TransportKind
+	AbstractCancellationTokenSource,
+	CancellationId,
+	CancellationReceiverStrategy,
+	CancellationSenderStrategy,
+	CancellationToken,
+	Event,
+	LanguageClient, LanguageClientOptions, MessageConnection, ServerOptions, TransportKind
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient;
 
 // Called by vscode on activation event, see package.json "activationEvents"
 export function activate(context: vscode.ExtensionContext): void {
-    client = startLanguageClient(context);
-    configureTemplateDecoration(context);
+	client = startLanguageClient(context);
+	configureTemplateDecoration(context);
 }
 
 export function deactivate(): Thenable<void> | undefined {
 	if (client) {
-        return client.stop();
+		return client.stop();
 	}
-    return undefined;
+	return undefined;
 }
 
 function startLanguageClient(context: vscode.ExtensionContext): LanguageClient {
-    const serverModule = context.asAbsolutePath(path.join('out', 'language-server', 'main'));
+	const serverModule = context.asAbsolutePath(path.join('out', 'language-server', 'main'));
 	// The debug options for the server
 	// --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
-	const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
+	const debugOptions = { execArgv: ['--nolazy', '--inspect-brk=6009'] };
 
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
 	const serverOptions: ServerOptions = {
-	  run: { module: serverModule, transport: TransportKind.ipc },
-	  debug: {
-		module: serverModule,
-		transport: TransportKind.ipc,
-		options: debugOptions
-	  }
+		run: { module: serverModule, transport: TransportKind.ipc },
+		debug: {
+			module: serverModule,
+			transport: TransportKind.ipc,
+			options: debugOptions
+		}
 	};
 
 	// Options to control the language client
 	const clientOptions: LanguageClientOptions = {
-	  // Register the server for langium documents
-	  documentSelector: [{ scheme: 'file', language: 'langium' }],
-	  synchronize: {
-		// Notify the server about file changes to langium files contained in the workspace
-		fileEvents: workspace.createFileSystemWatcher('**/*.langium')
-	  }
+		// Register the server for langium documents
+		documentSelector: [{ scheme: 'file', language: 'langium' }],
+		synchronize: {
+			// Notify the server about file changes to langium files contained in the workspace
+			fileEvents: workspace.createFileSystemWatcher('**/*.langium')
+		},
+		connectionOptions: {
+			cancellationStrategy: {
+				receiver: new LangiumCancellationReceiverStrategy(),
+				sender: new LangiumCancellationSenderStrategy()
+			}
+		}
 	};
 
 	// Create the language client and start the client.
 	const client = new LanguageClient(
-	  'langium',
-	  'Langium',
-	  serverOptions,
-	  clientOptions
+		'langium',
+		'Langium',
+		serverOptions,
+		clientOptions
 	);
 
 	// Start the client. This will also launch the server
 	client.start();
-    return client;
+	return client;
 }
 
+class LangiumCancellationReceiverStrategy implements CancellationReceiverStrategy {
+	createCancellationTokenSource(id: CancellationId): AbstractCancellationTokenSource {
+		return new LangiumCancellationTokenSource();
+	}
+}
+
+class LangiumCancellationSenderStrategy implements CancellationSenderStrategy {
+	sendCancellation(conn: MessageConnection, id: CancellationId): Promise<void> {
+		return Promise.resolve();
+	}
+
+	cleanup(id: CancellationId): void {
+
+	}
+
+	dispose(): void {
+
+	}
+}
+
+class LangiumCancellationTokenSource implements AbstractCancellationTokenSource {
+	private _token: LangiumCancellationToken = new LangiumCancellationToken();
+
+	get token(): CancellationToken {
+		return this._token;
+	}
+
+	cancel(): void {
+		this._token.cancel();
+	}
+
+	dispose(): void {
+		this._token.dispose();
+	}
+}
+
+class LangiumCancellationToken implements CancellationToken {
+	private isCancelled: boolean = true;
+
+	public cancel() {
+		this.isCancelled = true;
+	}
+
+	get isCancellationRequested(): boolean {
+		return this.isCancelled;
+	}
+
+	get onCancellationRequested(): Event<any> {
+		return Event.None;
+	}
+
+	public dispose(): void {}
+}
 
 // TODO(@@dd): externalize extension config
 const DELAY = 100; // delay in ms until a render can be cancelled on subsequent document changes
 
 function configureTemplateDecoration(context: vscode.ExtensionContext) {
-    // define decoration type
+	// define decoration type
 	const decorationType = vscode.window.createTextEditorDecorationType(decorationRenderOptions());
 
 	// creates a cancelable decorator that delays the update
@@ -135,11 +200,11 @@ function decorateText(document: vscode.TextDocument, decorations: vscode.Decorat
 	}
 }
 
- // TODO(@@dd): find bug
+// TODO(@@dd): find bug
 function findIndentation(text: string): number {
-    const indents = text.split(/[\r?\n]/g).map(line => line.trimRight()).filter(line => line.length > 0).map(line => line.search(/\S|$/));
-    const min = indents.length === 0 ? 0 : Math.min(...indents); // min(...[]) = min() = Infinity
-    return Math.max(0, min);
+	const indents = text.split(/[\r?\n]/g).map(line => line.trimRight()).filter(line => line.length > 0).map(line => line.search(/\S|$/));
+	const min = indents.length === 0 ? 0 : Math.min(...indents); // min(...[]) = min() = Infinity
+	return Math.max(0, min);
 }
 
 function isSmartTemplate(name: string, index: number): boolean {

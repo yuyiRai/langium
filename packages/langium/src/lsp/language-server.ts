@@ -87,7 +87,7 @@ export function addCompletionHandler(connection: Connection, services: LangiumSe
                     if (cancel.isCancellationRequested) {
                         resolve(CompletionList.create());
                     } else if (document) {
-                        workDoneProgress.begin("foo", 0);
+                        workDoneProgress.begin('foo', 0);
                         const text = document.getText();
                         const offset = document.offsetAt(_textDocumentPosition.position);
                         const parser = services.parser.LangiumParser;
@@ -116,10 +116,10 @@ export function addCompletionHandler(connection: Connection, services: LangiumSe
 
 export function addFindReferencesHandler(connection: Connection, services: LangiumServices): void {
     const referenceFinder = services.lsp.ReferenceFinder;
-    connection.onReferences((params: ReferenceParams, cancel, workDoneProgress: MyReporter): Location[] => {
+    connection.onReferences((params: ReferenceParams): Location[] => {
         const document = paramsDocument(params, services);
         if (document) {
-            workDoneProgress.begin('Start find refs', 0, undefined, false);
+            //workDoneProgress.begin('Start find refs', 0, undefined, false);
             return referenceFinder.findReferences(document, params, params.context.includeDeclaration);
         } else {
             return [];
