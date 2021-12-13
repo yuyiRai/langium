@@ -448,6 +448,18 @@ describe('Stream.flatMap', () => {
 
 describe('Stream.flat', () => {
 
+    test('correct type with arrays', () => {
+        const stream = s.stream([[1, 2], [[3, 4]]]);
+        const flattened: s.Stream<number> = stream.flat(2);
+        expect(flattened.toArray()).toMatchObject([1, 2, 3, 4]);
+    });
+
+    test('correct type with streams', () => {
+        const stream = s.stream([s.stream([1, 2]), s.stream([s.stream([3, 4])])]);
+        const flattened: s.Stream<number> = stream.flat(2);
+        expect(flattened.toArray()).toMatchObject([1, 2, 3, 4]);
+    });
+
     test('one level', () => {
         const stream = s.stream([1, [2, [3, [4, [5]]]]]);
         expect(stream.flat().toArray()).toMatchObject([1, 2, [3, [4, [5]]]]);
